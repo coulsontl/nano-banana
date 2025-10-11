@@ -67,6 +67,14 @@ export async function generateImage(request: GenerateRequest): Promise<GenerateR
         return { imageUrl: message.content }
     }
 
+    // 检查content是否是Markdown格式的图片链接
+    if (typeof message.content === 'string' && message.content.includes('![') && message.content.includes('](')) {
+        const markdownImageMatch = message.content.match(/!\[.*?\]\((https?:\/\/[^\s)]+)\)/)
+        if (markdownImageMatch && markdownImageMatch[1]) {
+            return { imageUrl: markdownImageMatch[1] }
+        }
+    }
+
     // 如果是文本回复，抛出错误或返回文本
     if (typeof message.content === 'string' && message.content.trim()) {
         throw new Error(`Model returned text instead of image: ${message.content}`)
