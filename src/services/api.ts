@@ -35,14 +35,31 @@ export async function generateImage(request: GenerateRequest): Promise<GenerateR
 
     const apiEndpoint = request.endpoint?.trim() || DEFAULT_API_ENDPOINT
 
-    const response = await fetch(apiEndpoint, {
-        method: 'POST',
-        headers: {
-            Authorization: `Bearer ${request.apikey}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-    })
+    // 创建AbortController用于超时控制，设置5分钟超时
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 300000) // 5分钟
+
+    let response: Response
+    try {
+        response = await fetch(apiEndpoint, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${request.apikey}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+        })
+    } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error('请求超时：生图请求超过了5分钟，请稍后重试或检查网络连接')
+        }
+        throw error
+    }
+
+    // 清除超时定时器
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
         const errorText = await response.text()
@@ -87,13 +104,30 @@ export async function fetchModels(apikey: string, endpoint: string): Promise<Api
     const apiEndpoint = endpoint?.trim() || DEFAULT_API_ENDPOINT
     const modelsUrl = resolveModelsEndpoint(apiEndpoint)
 
-    const response = await fetch(modelsUrl, {
-        method: 'GET',
-        headers: {
-            Authorization: `Bearer ${apikey}`,
-            'Content-Type': 'application/json'
+    // 创建AbortController用于超时控制，设置30秒超时
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000) // 30秒
+
+    let response: Response
+    try {
+        response = await fetch(modelsUrl, {
+            method: 'GET',
+            headers: {
+                Authorization: `Bearer ${apikey}`,
+                'Content-Type': 'application/json'
+            },
+            signal: controller.signal
+        })
+    } catch (error) {
+        clearTimeout(timeoutId)
+        if (error instanceof Error && error.name === 'AbortError') {
+            throw new Error('请求超时：获取模型列表超过了30秒，请检查网络连接')
         }
-    })
+        throw error
+    }
+
+    // 清除超时定时器
+    clearTimeout(timeoutId)
 
     if (!response.ok) {
         const errorText = await response.text()
